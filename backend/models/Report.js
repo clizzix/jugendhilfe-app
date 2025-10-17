@@ -16,7 +16,7 @@ const ReportSchema = new mongoose.Schema({
     reportText: {
         type: String,
         required: function() {
-            return !this.fileMetadata; // Entweder Text ODER Datei muss vorhanden sein
+            return this.type === 'REPORT'; // Entweder Text ODER Datei muss vorhanden sein
         },
     },
     // Für hochgeladene Dateien (US4)
@@ -27,6 +27,9 @@ const ReportSchema = new mongoose.Schema({
         storagePath: String, 
         originalName: String,
         size: Number,
+    },
+    isDocument: {
+        type: Boolean,
         required: function() {
             return !this.reportText; // Entweder Text ODER Datei muss vorhanden sein
         },
