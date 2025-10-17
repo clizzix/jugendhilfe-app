@@ -18,3 +18,5 @@ google-vision-key.json
 /uploads
 /dist
 /build
+
+/shared/node_modules
