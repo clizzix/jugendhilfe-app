@@ -1,22 +1,43 @@
 // utils/kiService.js
-import * as deepl from 'deepl'; 
+import { ImageAnnotatorClient } from '@google-cloud/vision';
+import fs from 'fs/promises';
 import dotenv from 'dotenv';
 // import { TesseractWorker } from 'tesseract.js'; // Beispiel für lokale OCR
 
 dotenv.config();
 
 // MOCK: Integration DeepL (muss für echte Nutzung angepasst werden)
-const translator = deepl.createTranslator(process.env.DEEPL_API_KEY);
+const DEEPL_URL = 'https://api-free.deepl.com/v2/translate';
+
 
 export const translateText = async (text, targetLang) => {
     try {
-        // Deepl verwendet ISO-Codes, die ggf. angepasst werden müssen (z.B. Somalisch ist nicht direkt verfügbar)
-        const result = await translator.translateText(text, null, targetLang); 
-        return result.text;
+        const response = await fetch(DEEPL_URL, {
+            method: 'POST',
+            headers: {
+                // Wichtig: JWT_SECRET ist NICHT der DeepL Schlüssel. Wir nutzen DEEPL_API_KEY.
+                'Authorization': `DeepL-Auth-Key ${process.env.DEEPL_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                text: [text],
+                target_lang: targetLang.toUpperCase(), // DeepL erwartet Großbuchstaben (z.B. "AR")
+            })
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`DeepL API Fehler (${response.status}): ${errorBody}`);
+        }
+
+        const data = await response.json();
+        
+        // Die Antwort enthält ein Array von Übersetzungen
+        return data.translations[0].text; 
+
     } catch (error) {
         console.error('DeepL Fehler:', error.message);
-        // Fallback- oder Fehlermeldung
-        return "Fehler bei der Übersetzung: " + error.message; 
+        throw new Error("Fehler bei der Übersetzung: Konnte DeepL API nicht erreichen."); 
     }
 };
 
