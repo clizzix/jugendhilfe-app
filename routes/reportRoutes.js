@@ -3,6 +3,8 @@ import express from 'express';
 import multer from 'multer';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 import { createReport, uploadDocument } from '../controllers/reportController.js';
+import { startTranslation } from '../controllers/translationController.js';
+
 
 const router = express.Router();
 
@@ -21,5 +23,11 @@ router.post('/text', authorize('fachkraft'), createReport);
 // US4: Dokument hochladen (mit Multer)
 // 'single('document')' erwartet ein Feld namens 'document' im Formular
 router.post('/document', authorize('fachkraft'), upload.single('document'), uploadDocument); 
+
+// Übersetzung starten (FK und KO)
+router.post('/translate', startTranslation);
+
+// NEU: Endpunkt zum Download der generierten PDF (nicht gezeigt, aber notwendig)
+// router.get('/download/:filename', downloadPDF);
 
 export default router;
