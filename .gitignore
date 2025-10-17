@@ -1,7 +1,8 @@
 # -----------------------------------------------------------------
 # 1. Node und Abhängigkeiten
 # -----------------------------------------------------------------
-/node_modules
+node_modules/
+shared/node_modules/
 /npm-debug.log
 .DS_Store # Mac OS spezifisch
 
@@ -9,14 +10,18 @@
 # 2. Sensible Daten und Konfiguration (MUSS IGNORIERT WERDEN)
 # -----------------------------------------------------------------
 .env 
+backend/.env
 # Enthält MONGO_URI, JWT_SECRET und später API-Schlüssel für DeepL/OCR!
 google-vision-key.json
 # -----------------------------------------------------------------
 # 3. Temporäre Dateien und Uploads
 # -----------------------------------------------------------------
 # Temporärer Speicherort für Multer-Uploads (aus reportRoutes.js)
-/uploads
-/dist
+backend/routes/uploads
+web/dist/
 /build
+mobile/android/
+mobile/ios/
 
-/jugendhilfe-app/shared/node_modules
+.vscode/
+npm-debug.log*
