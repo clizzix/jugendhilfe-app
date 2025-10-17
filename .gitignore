@@ -1,0 +1,20 @@
+# -----------------------------------------------------------------
+# 1. Node und Abhängigkeiten
+# -----------------------------------------------------------------
+/node_modules
+/npm-debug.log
+.DS_Store # Mac OS spezifisch
+
+# -----------------------------------------------------------------
+# 2. Sensible Daten und Konfiguration (MUSS IGNORIERT WERDEN)
+# -----------------------------------------------------------------
+.env 
+# Enthält MONGO_URI, JWT_SECRET und später API-Schlüssel für DeepL/OCR!
+
+# -----------------------------------------------------------------
+# 3. Temporäre Dateien und Uploads
+# -----------------------------------------------------------------
+# Temporärer Speicherort für Multer-Uploads (aus reportRoutes.js)
+/uploads
+/dist
+/build
