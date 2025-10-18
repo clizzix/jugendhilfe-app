@@ -11,7 +11,6 @@ export const protect = async (req, res, next) => {
         try {
             // Token aus dem Header extrahieren
             token = req.headers.authorization.split(' ')[1];
-
             // Token entschlüsseln
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
@@ -24,9 +23,8 @@ export const protect = async (req, res, next) => {
             console.error(error);
             return res.status(401).json({ msg: 'Nicht autorisiert, Token fehlgeschlagen' });
         }
-    }
-
-    if (!token) {
+    } else {
+        // Wenn kein Header vorhanden ist, direkt ablehnen.
         return res.status(401).json({ msg: 'Nicht autorisiert, kein Token vorhanden' });
     }
 };

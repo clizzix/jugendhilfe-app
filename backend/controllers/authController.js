@@ -33,12 +33,14 @@ export const registerFachkraft = async (req, res) => {
             role: 'fachkraft', // Fest auf fachkraft setzen
         });
 
+        const token = generateToken(user._id, user.role);
+
         // 4. Antwort
         res.status(201).json({ 
             _id: user._id, 
             username: user.username, 
             role: user.role,
-            token: generateToken(user._id, user.role),
+            token: token // Sende das Token auch hier zurück, falls benötigt
         });
 
     } catch (err) {
@@ -55,12 +57,18 @@ export const loginUser = async (req, res) => {
     try {
         // 1. Benutzer finden (mit Passwort, da 'select: false' im Schema ist)
         const user = await User.findOne({ username }).select('+password');
+
         if (!user) {
+
             return res.status(401).json({ msg: 'Ungültige Anmeldedaten' });
         }
+        
+        // Log 2: DB-Hash (Jetzt sicher)
+        console.log("DB-Hash für Benutzer:", user.password);
 
         // 2. Passwort vergleichen
         const isMatch = await bcrypt.compare(password, user.password);
+  
         if (!isMatch) {
             return res.status(401).json({ msg: 'Ungültige Anmeldedaten' });
         }

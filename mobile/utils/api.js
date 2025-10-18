@@ -6,15 +6,14 @@ const API_URL = 'http://localhost:5001/api';
 
 const apiClient = axios.create({
     baseURL: API_URL,
-    // withCredentials: true,
     headers: {
         'Content-Type': 'application/json',
     }
 });
 
+// Interceptor, um den JWT-Token zu jeder Anfrage hinzuzufügen
 apiClient.interceptors.request.use(config => {
-    // Annahme: Ihr Frontend speichert das Token beim Login in localStorage.
-    const token = localStorage.getItem('jwtToken'); 
+    const token = localStorage.getItem('jwtToken') || sessionStorage.getItem('jwtToken');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
     }
