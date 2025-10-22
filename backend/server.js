@@ -20,24 +20,34 @@ const PORT = process.env.PORT || 5001;
 const allowedOrigins = [
     'http://localhost:5173', // Web-Dashboard
     'http://localhost:8081', // Mobile App Web-Vorschau (Expo)
-    'http://localhost:19006' // Manchmal Expo's Standardport
+    'http://localhost:19006',
+    'http://localhost:5001',
+    'http://10.0.2.2:5001',    // ✨ WICHTIG: Android Emulator Zugriff auf Host (Port 5001)
+    'http://10.0.2.2:8081',
+    'http://192.168.0.161:5001',
+    'http://192.168.0.161:8081'
+
 ];
-// ------------------------------------------------------------------
-// 1. CORS KONFIGURATION (JETZT ALS ALLERERSTES!)
-// Dies behebt den hartnäckigen OPTIONS-Fehler.
-// ------------------------------------------------------------------
-app.use(cors({
+
+// Temporäre Lockerung: Erlaubt alle lokalen IPs, um das Problem zu beweisen
+const corsOptions = {
     origin: function (origin, callback) {
-        // Erlaubt Anfragen, wenn der Ursprung in der Whitelist ist oder wenn es keine Ursprungsangabe gibt (z.B. Postman)
-        if (!origin || allowedOrigins.includes(origin)) {
+        // Erlaubt Anfragen, wenn der Ursprung in der Whitelist ist, wenn der Origin undefined ist (Postman/direkte Aufrufe)
+        // ODER wenn der Origin mit Ihrer lokalen IP beginnt (Wildcard für alle Ports auf dieser IP)
+        if (!origin || allowedOrigins.includes(origin) || (origin && origin.startsWith('http://192.168.0.161'))) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
         }
     },
-    // Wenn Sie zur Header/Bearer Token-Methode zurückgekehrt sind, lassen Sie credentials weg oder setzen Sie es auf false.
-    // Da Sie mit Header arbeiten: Sie könnten credentials: false verwenden, aber lassen Sie es für lokale Tests weg.
-}));
+    // Fügen Sie headers hinzu, da Sie Auth-Token verwenden
+    allowedHeaders: ['Content-Type', 'Authorization'],
+};
+// ------------------------------------------------------------------
+// 1. CORS KONFIGURATION (JETZT ALS ALLERERSTES!)
+// Dies behebt den hartnäckigen OPTIONS-Fehler.
+// ------------------------------------------------------------------
+app.use(cors(corsOptions));
 
 // 2. Middleware, um JSON-Anfragen zu parsen
 app.use(express.json());

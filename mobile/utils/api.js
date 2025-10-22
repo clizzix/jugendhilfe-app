@@ -1,9 +1,14 @@
-// shared/api.js
+// utils/api.js
 import axios from 'axios'; 
 
 // Basis-URL des Backends (passen Sie den Port an, falls Ihr Backend woanders läuft)
-const API_URL = 'http://localhost:5001/api'; 
+const API_URL = 'http://http://192.168.0.161:5001'; 
 
+let authToken = null;
+
+export const setAuthToken = (token) => {
+    authToken = token;
+}
 const apiClient = axios.create({
     baseURL: API_URL,
     // withCredentials: true,
@@ -13,10 +18,8 @@ const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(config => {
-    // Annahme: Ihr Frontend speichert das Token beim Login in localStorage.
-    const token = localStorage.getItem('jwtToken'); 
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+    if (authToken) {
+        config.headers.Authorization = `Bearer ${authToken}`;
     }
     return config;
 }, error => {

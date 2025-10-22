@@ -17,7 +17,8 @@
       "bundleIdentifier": "com.clizzix.jugendhilfe-app"
     },
     "android": {
-      "package": "com.clizzix.jugendhilfeapp",
+      "package": "com.clizzix.jugendhilfe.app",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

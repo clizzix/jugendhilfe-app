@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
-import { login } from '../utils/api'; 
+import { login, setAuthToken } from '../utils/api'; 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen = ({ navigation }) => {
@@ -11,6 +11,7 @@ const LoginScreen = ({ navigation }) => {
     const handleLogin = async () => {
         setLoading(true);
         try {
+            console.log("Versuche Login mit:", username);
             const response = await login(username, password);
             const { token, role } = response.data;
             
@@ -21,7 +22,8 @@ const LoginScreen = ({ navigation }) => {
 
                 // 2. Rolle speichern (optional, aber hilfreich)
                 await AsyncStorage.setItem('userRole', role);
-            
+                
+                setAuthToken(token);
                 // Navigiere zum Dashboard
                 navigation.replace('Dashboard');
             } else {
@@ -30,8 +32,24 @@ const LoginScreen = ({ navigation }) => {
             }
 
         } catch (error) {
-            const msg = error.response?.data?.msg || "Anmeldung fehlgeschlagen. Server nicht erreichbar.";
-            Alert.alert("Anmeldefehler", msg);
+            let errorMsg = "Anmeldung fehlgeschlagen. Server nicht erreichbar.";
+            
+            if (error.response) {
+                // Der Server hat geantwortet, aber mit einem Fehlercode (z.B. 401, 500)
+                errorMsg = error.response.data?.msg || `Server-Fehler: Status ${error.response.status}`;
+            } else if (error.request) {
+                // Der Request wurde gesendet, aber es kam keine Antwort vom Server
+                // Dies deutet stark auf ein Netzwerk-Timeout oder CORS-Fehler hin.
+                errorMsg = "Netzwerk-Fehler: Server nicht erreichbar oder Timeout.";
+            } else {
+                // Fehler beim Einrichten des Requests (z.B. falsche URL, DNS-Fehler)
+                errorMsg = `Kritischer Fehler beim Request: ${error.message}`;
+            }
+
+            // WICHTIG: Loggen des gesamten Fehlerobjekts im Terminal
+            console.log("AXIOS ERROR DETAILS:", error); 
+            
+            Alert.alert("Anmeldefehler", errorMsg);
         } finally {
             setLoading(false);
         }
