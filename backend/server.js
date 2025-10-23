@@ -25,7 +25,8 @@ const allowedOrigins = [
     'http://10.0.2.2:5001',    // ✨ WICHTIG: Android Emulator Zugriff auf Host (Port 5001)
     'http://10.0.2.2:8081',
     'http://192.168.0.161:5001',
-    'http://192.168.0.161:8081'
+    'http://192.168.0.161:8081',
+    'https://denunciatively-snappy-glenn.ngrok-free.dev'
 
 ];
 

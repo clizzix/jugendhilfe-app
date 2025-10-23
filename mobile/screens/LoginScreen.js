@@ -45,9 +45,6 @@ const LoginScreen = ({ navigation }) => {
                 // Fehler beim Einrichten des Requests (z.B. falsche URL, DNS-Fehler)
                 errorMsg = `Kritischer Fehler beim Request: ${error.message}`;
             }
-
-            // WICHTIG: Loggen des gesamten Fehlerobjekts im Terminal
-            console.log("AXIOS ERROR DETAILS:", error); 
             
             Alert.alert("Anmeldefehler", errorMsg);
         } finally {

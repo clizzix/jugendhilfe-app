@@ -2,7 +2,7 @@
 import axios from 'axios'; 
 
 // Basis-URL des Backends (passen Sie den Port an, falls Ihr Backend woanders läuft)
-const API_URL = 'http://http://192.168.0.161:5001'; 
+const API_URL = 'https://denunciatively-snappy-glenn.ngrok-free.dev/api'; 
 
 let authToken = null;
 
