@@ -72,6 +72,8 @@ export const uploadDocument = (clientId, file) => {
     
     // Die Klienten-ID ist wichtig für die Backend-Autorisierung
     formData.append('clientId', clientId);
+    formData.append('isDocument', 'true');
+    formData.append('content', file.name);
     
     // Das Dokument: Das Feld muss 'document' heißen,
     // da dies das Feld ist, das Multer im Backend erwartet (upload.single('document')).

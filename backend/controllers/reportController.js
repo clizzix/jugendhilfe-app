@@ -64,7 +64,10 @@ const uploadFileToCloud = async (file) => {
 
 // US4: Datei hochladen (Komplex: erfordert Multer und Cloud-Speicher)
 export const uploadDocument = async (req, res) => {
-    const { clientId } = req.body;
+    // 💡 FÜGE DIESEN LOG HINZU
+    console.log("Req Body:", req.body); 
+    console.log("Req File:", req.file);
+    const { clientId, content, isDocument } = req.body;
     const authorId = req.user._id;
 
     console.log("--- DEBUG UPLOAD ---");
@@ -96,6 +99,8 @@ export const uploadDocument = async (req, res) => {
             client: clientId,
             createdBy: authorId,
             type: 'DOCUMENT',
+            content: content,
+            isDocument: isDocument === 'true',
             fileMetadata: {
                 fileName: storageResult.filename, 
                 fileType: req.file.mimetype.includes('.pdf') ? 'PDF' : 'DOCX',
@@ -110,12 +115,18 @@ export const uploadDocument = async (req, res) => {
 
         res.status(201).json(newDocument);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Fehler beim Dateiupload:', err.message);
+        // Loggt den Validierungsfehler, der den 500er verursacht hat
+        console.error("Report Upload Error:", err); 
+        
+        // Temporäre Datei bei Fehler löschen
         if (fs.existsSync(tempFilePath)) {
             fs.unlinkSync(tempFilePath);
         }
-        res.status(500).json({ msg: 'Serverfehler beim Hochladen der Datei.'});
+        
+        // Saubere Fehlerantwort mit Rückgabe
+        return res.status(500).json({ 
+            msg: `Serverfehler beim Hochladen der Datei. Details: ${err.message}` 
+        });
     }
 };
 /**
