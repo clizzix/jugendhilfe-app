@@ -10,7 +10,9 @@ import {
     FlatList, 
     ActivityIndicator, 
     RefreshControl,
-    TouchableOpacity, 
+    TouchableOpacity,
+    KeyboardAvoidingView,
+    Platform, 
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -308,6 +310,40 @@ const ReportScreen = () => {
         setEditingReportId(report._id);
     };
 
+    // 💡 NEUE FUNKTION: Das Formular als Header-Komponente definieren
+    const renderHeader = () => (
+        // Der Inhalt des alten ScrollViews
+        <View style={styles.formSection}> 
+            <Text style={styles.header}>Neuer Bericht für:</Text>
+            <Text style={styles.clientName}>{clientName}</Text>
+
+            <TextInput
+                style={styles.input}
+                multiline
+                numberOfLines={6}
+                placeholder="Geben Sie hier den Tagesbericht ein..."
+                value={reportText}
+                onChangeText={setReportText}
+                textAlignVertical="top"
+            />
+            
+            <Button
+                title={isSaving ? "Speichere..." : "Bericht speichern"}
+                onPress={handleSubmit}
+                disabled={isSaving || !reportText.trim()}
+                color="#2ecc71"
+            />
+            
+            <View style={styles.uploadButtonContainer}>
+                <Button
+                    title={isUploading ? "Lade Dokument hoch..." : "Dokument hochladen (US4)"}
+                    onPress={handleDocumentUpload}
+                    disabled={isUploading || isSaving}
+                    color="#3498db"
+                />
+            </View>
+        </View>
+    );
 
     if (authLoading) {
         return (
@@ -319,81 +355,53 @@ const ReportScreen = () => {
     }
     
     // Finaler Return Block: Übergibt alle notwendigen Handler und Zustände
-    return (
-        <View style={styles.mainContainer}>
+return (
+        // 💡 KORREKTUR: KeyboardAvoidingView ist der Hauptcontainer.
+        <KeyboardAvoidingView 
+            style={styles.mainContainer}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} // Optional: Passen Sie dies an Ihren Header an (z.B. 90 für iOS, falls ein Nav-Header vorhanden ist)
+        >
+            {/* --- Berichts-Historie (US6) wird zur Hauptansicht --- */}
+            <Text style={styles.listHeader}>Berichts-Historie</Text>
+
+            {isLoadingReports && !isRefreshing && reports.length === 0 ? (
+                 <ActivityIndicator size="large" color="#3498db" style={{marginTop: 20}} />
+            ) : (
+                <FlatList
+                    data={reports}
+                    keyExtractor={item => item._id.toString()}
+                    
+                    // 💡 HINZUFÜGUNG: Formular als nicht-scrollender Header.
+                    ListHeaderComponent={renderHeader} 
+                    
+                    renderItem={({ item }) => (
+                        <ReportItem 
+                            report={item} 
+                            isEditing={editingReportId === item._id}
+                            editText={editText}
+                            setEditText={setEditText}
+                            setEditingReportId={setEditingReportId}
+
+                            onEditStart={startEditing}
+                            onEditSave={handleEditSave}
+                            onDelete={handleDelete}
+
+                            currentUserId={currentUserId}
+                            currentUserRole={currentUserRole}
+                        />
+                    )}
+                    refreshControl={
+                        <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#3498db']} />
+                    }
+                    ListEmptyComponent={
+                        <Text style={styles.emptyText}>Bisher keine Berichte vorhanden.</Text>
+                    }
+                />
+            )}
             
-            {/* --- Berichts-Eingabe (US5) --- */}
-            <ScrollView contentContainerStyle={styles.formSection}>
-                <Text style={styles.header}>Neuer Bericht für:</Text>
-                <Text style={styles.clientName}>{clientName}</Text>
-
-                <TextInput
-                    style={styles.input}
-                    multiline
-                    numberOfLines={6}
-                    placeholder="Geben Sie hier den Tagesbericht ein..."
-                    value={reportText}
-                    onChangeText={setReportText}
-                    textAlignVertical="top"
-                />
-                
-                <Button
-                    title={isSaving ? "Speichere..." : "Bericht speichern"}
-                    onPress={handleSubmit}
-                    disabled={isSaving || !reportText.trim()}
-                    color="#2ecc71"
-                />
-                {/* NEU: Button für Dokumenten-Upload */}
-                <View style={styles.uploadButtonContainer}>
-                    <Button
-                        title={isUploading ? "Lade Dokument hoch..." : "Dokument hochladen (US4)"}
-                        onPress={handleDocumentUpload}
-                        disabled={isUploading || isSaving}
-                        color="#3498db"
-                    />
-                </View>
-            </ScrollView>
-
-            {/* --- Berichts-Historie (US6) --- */}
-            <View style={styles.listSection}>
-                <Text style={styles.listHeader}>Berichts-Historie</Text>
-                
-                {isLoadingReports && !isRefreshing ? (
-                    <ActivityIndicator size="large" color="#3498db" style={{marginTop: 20}} />
-                ) : (
-                    <FlatList
-                        data={reports}
-                        keyExtractor={item => item._id.toString()}
-                        renderItem={({ item }) => (
-                            <ReportItem 
-                                report={item} 
-                                // Zustand für Bearbeitung
-                                isEditing={editingReportId === item._id}
-                                editText={editText}
-                                setEditText={setEditText}
-                                setEditingReportId={setEditingReportId}
-
-                                // Handler
-                                onEditStart={startEditing}
-                                onEditSave={handleEditSave}
-                                onDelete={handleDelete}
-
-                                // Berechtigungen (vom Auth-Context)
-                                currentUserId={currentUserId}
-                                currentUserRole={currentUserRole}
-                            />
-                        )}
-                        refreshControl={
-                            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#3498db']} />
-                        }
-                        ListEmptyComponent={
-                            <Text style={styles.emptyText}>Bisher keine Berichte vorhanden.</Text>
-                        }
-                    />
-                )}
-            </View>
             <Toast />
-        </View>
+        </KeyboardAvoidingView>
     );
 };
 
@@ -430,9 +438,11 @@ const styles = StyleSheet.create({
         minHeight: 120, 
         fontSize: 16,
     },
+    /*
     listSection: {
         flex: 1, 
     },
+    */
     listHeader: {
         fontSize: 18,
         fontWeight: 'bold',
