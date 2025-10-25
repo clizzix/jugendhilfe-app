@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'; // Neu: Im
 import LoginScreen from './screens/LoginScreen';
 import FachkraftDashboard from './screens/FachkraftDashboard'; 
 import ReportScreen from './screens/ReportScreen';
+import { AuthProvider } from './context/AuthContext';
 
 const Stack = createNativeStackNavigator();
 
@@ -49,7 +50,8 @@ const App = () => {
   }
 
   return (
-    <NavigationContainer>
+    <AuthProvider>
+      <NavigationContainer>
       <Stack.Navigator initialRouteName={initialRoute}>
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Dashboard" component={FachkraftDashboard} options={{ title: 'Meine Klienten' }} />
@@ -59,7 +61,8 @@ const App = () => {
                     options={{ title: 'Bericht erstellen' }} 
                 />
       </Stack.Navigator>
-    </NavigationContainer>
+      </NavigationContainer>
+    </AuthProvider>
   );
 };
 

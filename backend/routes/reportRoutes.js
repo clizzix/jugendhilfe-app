@@ -7,7 +7,9 @@ import {
     createReport, 
     uploadDocument, 
     getClientReports, // US6: Neu hinzugefügt
-    downloadDocumentController// downloadPDF // Falls benötigt
+    downloadDocumentController,// downloadPDF // Falls benötigt
+    updateReport, 
+    deleteReport
 } from '../controllers/reportController.js'; 
 import { startTranslation } from '../controllers/translationController.js';
 
@@ -51,7 +53,14 @@ router.get('/download/:reportId', protect, authorize('fachkraft', 'verwaltung'),
 // (Fachkraft dem Klienten zugewiesen oder Rolle Verwaltung) IM Controller (getClientReports) erfolgt.
 router.get('/:clientId', protect, authorize('fachkraft', 'verwaltung'), getClientReports);
 
+// GET Reports for a client (US6)
+router.get('/:clientId', protect, getClientReports);
 
+// 💡 NEUE ROUTEN FÜR UPDATE UND DELETE
+// PUT Update Report (US7) & DELETE Report (US8)
+router.route('/:reportId')
+    .put(protect, updateReport) // Bericht bearbeiten
+    .delete(protect, deleteReport); // Bericht löschen
 // -------------------------------------------------------------------------
 // ZUSÄTZLICH: ÜBERSETZUNG (Nicht-Kernfunktion, aber im Code)
 // -------------------------------------------------------------------------

@@ -1,5 +1,3 @@
-// mobile/screens/ReportScreen.js (KORRIGIERT für useFocusEffect)
-
 import React, { useState, useCallback } from 'react';
 import { 
     View, 
@@ -16,13 +14,35 @@ import {
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { createReport, getClientReports, uploadDocument, getDownloadLink } from '../utils/api.js';
+import { createReport, getClientReports, uploadDocument, getDownloadLink, deleteReport, updateReport } from '../utils/api.js';
 import * as Linking from 'expo-linking'; 
+import Toast from 'react-native-toast-message'; 
+import { useAuth } from '../context/AuthContext'; 
 
 
 // --- Komponente für die Anzeige eines Berichts ---
-const ReportItem = ({ report }) => {
+const ReportItem = ({ 
+    report, 
+    isEditing, 
+    editText, 
+    setEditText, 
+    setEditingReportId,
+    onEditStart, 
+    onEditSave, 
+    onDelete,
+    currentUserId,
+    currentUserRole,
+}) => {
     const [isDownloading, setIsDownloading] = useState(false);
+
+    // Hilfsvariablen
+    const isCreator = report.createdBy?._id?.toString() === currentUserId?.toString(); 
+    const isLocked = report.isLocked;
+    const isTextReport = report.type !== 'DOCUMENT';
+
+    const isAdminOrVerwaltung = currentUserRole === 'admin' || currentUserRole === 'verwaltung';
+    const canModify = !isLocked && (isCreator || isAdminOrVerwaltung);
+
     // Formatierung des Datums
     const formattedDate = new Date(report.createdAt).toLocaleDateString('de-DE', {
         day: '2-digit',
@@ -33,44 +53,89 @@ const ReportItem = ({ report }) => {
     });
 
     const handleDownload = async () => {
-        if (report.type !== 'DOCUMENT') return;
+        if (!report.fileMetadata?.storagePath) return;
         setIsDownloading(true);
         try {
-            // 1. Download-Link vom Backend holen
             const response = await getDownloadLink(report._id);
             const { downloadUrl, fileName } = response.data;
-
-            // 2. Datei im Browser/Viewer öffnen
-            // WICHTIG: Linking.openURL ist der Standardweg in Expo
             await Linking.openURL(downloadUrl); 
-            Alert.alert('Download gestartet', `Öffne Dokument: ${fileName}`);
-
+            Toast.show({ type: 'info', text1: 'Download gestartet', text2: `Öffne Dokument: ${fileName}` });
         } catch (error) {
-            Alert.alert('Fehler', 'Konnte Download-Link nicht abrufen.');
+            Toast.show({ type: 'error', text1: 'Fehler', text2: 'Konnte Download-Link nicht abrufen.' });
             console.error(error.response?.data?.msg || error.message);
         } finally {
             setIsDownloading(false);
         }
     };
-
+    
     return (
         <TouchableOpacity 
-            // NEU: Nur klicken erlauben, wenn es ein Dokument ist
-            onPress={report.type === 'DOCUMENT' ? handleDownload : null} 
+            onPress={isTextReport || isEditing ? null : handleDownload} 
             style={styles.reportItem}
+            activeOpacity={isEditing ? 1 : 0.6}
         >
             <Text style={styles.reportHeader}>
                 Bericht von: {report.createdBy?.username || 'Unbekannt'}
                 <Text style={styles.reportDate}> ({formattedDate})</Text>
             </Text>
             
-            {/* NEU: Bedingte Anzeige für Dokumente oder Text */}
-            {report.type === 'DOCUMENT' ? (
-                <Text style={styles.documentLink}>
-                    {isDownloading ? "Dokument wird geöffnet..." : `📁 ${report.fileMetadata?.originalName || 'Dokument'} (Zum Öffnen tippen)`}
-                </Text>
+            {/* --- BEARBEITUNGSANSICHT (EDITING MODE) --- */}
+            {isEditing ? (
+                <>
+                    <TextInput
+                        style={styles.editInput} 
+                        multiline
+                        value={editText}
+                        onChangeText={setEditText}
+                        textAlignVertical="top"
+                    />
+                    <View style={styles.actionRow}>
+                        <Button title="Speichern" onPress={onEditSave} color="#2ecc71" />
+                        <Button title="Abbrechen" onPress={() => setEditingReportId(null)} color="#7f8c8d" />
+                    </View>
+                </>
             ) : (
-                <Text style={styles.reportContent}>{report.reportText || report.content}</Text>
+                /* --- LESEANSICHT (READ MODE) --- */
+                <>
+                    {/* Inhalt anzeigen */}
+                    {report.type === 'DOCUMENT' ? (
+                        <Text style={styles.documentLink}>
+                            {isDownloading ? "Dokument wird geöffnet..." : `📁 ${report.fileMetadata?.originalName || 'Dokument'} (Zum Öffnen tippen)`}
+                        </Text>
+                    ) : (
+                        <Text style={styles.reportContent}>{report.reportText || report.content}</Text>
+                    )}
+
+                    {/* AKTIONEN (Buttons) */}
+                    <View style={styles.actionRow}>
+                        
+                        {/* 1. BEARBEITEN (Nur für Text, wenn canModify wahr ist) */}
+                        {isTextReport && canModify && (
+                            <Button 
+                                title="Bearbeiten" 
+                                onPress={() => onEditStart(report)} 
+                                color="#3498db"
+                            />
+                        )}
+
+                        {/* 2. LÖSCHEN (Wenn canModify wahr ist) */}
+                        {canModify && (
+                            <Button 
+                                title="Löschen" 
+                                onPress={() => onDelete(report._id)} 
+                                color="#e74c3c" // Rot für Löschen
+                            />
+                        )}
+                        
+                        {/* 3. DOKUMENT ÖFFNEN BUTTON */}
+                        {!isTextReport && (
+                             <Button title="Öffnen" onPress={handleDownload} color="#3498db" />
+                        )}
+
+                        {/* 4. GESPERRT-STATUS */}
+                        {isLocked && <Text style={styles.lockedText}> [GESPERRT] </Text>}
+                    </View>
+                </>
             )}
         </TouchableOpacity>
     );
@@ -78,6 +143,10 @@ const ReportItem = ({ report }) => {
 // --------------------------------------------------
 
 const ReportScreen = () => {
+    const { user, isLoading: authLoading } = useAuth();
+    const currentUserId = user?._id || user?.id;
+    const currentUserRole = user?.role;
+
     const route = useRoute(); 
     const navigation = useNavigation();
     const { clientId, clientName } = route.params; 
@@ -89,36 +158,35 @@ const ReportScreen = () => {
     const [isLoadingReports, setIsLoadingReports] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [editingReportId, setEditingReportId] = useState(null);
+    const [editText, setEditText] = useState('');
 
 
     // --- Funktion zum Abrufen der Berichte (US6) ---
-    // MUSS in useCallback, um Stabilität zu gewährleisten
     const fetchReports = useCallback(async () => {
-        // Setzt isLoadingReports nur, wenn es kein Pull-to-Refresh ist, 
-        // um den Ladespinner nicht zu überblenden.
         if (!isRefreshing) setIsLoadingReports(true);
         
         try {
             const response = await getClientReports(clientId); 
             setReports(response.data);
         } catch (error) {
-            Alert.alert('Fehler', 'Konnte Berichte nicht laden.');
+            Toast.show({ type: 'error', text1: 'Fehler', text2: 'Konnte Berichte nicht laden.' });
             console.error(error.response?.data?.msg || error.message);
         } finally {
             setIsLoadingReports(false);
             setIsRefreshing(false);
         }
-    // Abhängig von clientId und isRefreshing (da es den Ladezustand beeinflusst)
     }, [clientId, isRefreshing]); 
 
 
     // --- Hook für den Ladevorgang ---
-    // Übergibt die stabile Funktion fetchReports direkt an useFocusEffect
     useFocusEffect(
-    React.useCallback(() => {
-        // Ruft die asynchrone Funktion auf, gibt aber selbst KEIN Promise zurück
-        fetchReports();
-    }, [fetchReports])
+        React.useCallback(() => {
+            // 💡 KORRIGIERT: fetchReports nur starten, wenn Authentifizierungsdaten geladen sind
+            if (!authLoading) {
+                fetchReports();
+            }
+        }, [fetchReports, authLoading]) // Abhängigkeit von authLoading hinzugefügt
     );
     
     
@@ -132,7 +200,7 @@ const ReportScreen = () => {
     // --- Formular-Handler (US5) ---
     const handleSubmit = async () => {
         if (!reportText.trim()) {
-            Alert.alert('Fehler', 'Bitte geben Sie Text für den Bericht ein.');
+            Toast.show({ type: 'error', text1: 'Fehler', text2: 'Bitte geben Sie Text für den Bericht ein.' });
             return;
         }
 
@@ -141,50 +209,116 @@ const ReportScreen = () => {
         try {
             await createReport(clientId, reportText);
             
-            Alert.alert('Erfolg', 'Bericht wurde erfolgreich gespeichert.');
+            Toast.show({ type: 'success', text1: 'Erfolg', text2: 'Bericht wurde erfolgreich gespeichert.' });
             setReportText(''); 
-            fetchReports(); // Berichtsliste neu laden
+            fetchReports(); 
 
         } catch (error) {
-            Alert.alert('Fehler', error.response?.data?.msg || 'Bericht konnte nicht gespeichert werden.');
+            Toast.show({ type: 'error', text1: 'Fehler', text2: error.response?.data?.msg || 'Bericht konnte nicht gespeichert werden.' });
         } finally {
             setIsSaving(false);
         }
     };
+
+    // ... (handleDocumentUpload, handleDelete, handleEditSave, startEditing bleiben unverändert)
 
     // Dokument-Upload Handler
     const handleDocumentUpload = async () => {
         setIsUploading(true);
 
         try {
-            // 1. Dokumenten-Picker öffnen
             const result = await DocumentPicker.getDocumentAsync({
-                type: '*/*', // Erlaubt alle Dateitypen
-                copyToCacheDirectory: true, // Wichtig für den Zugriff auf die URI
+                type: '*/*', 
+                copyToCacheDirectory: true, 
             });
 
-            // Wenn der Benutzer den Vorgang abbricht
-            if (result.canceled || !result.assets || result.assets.length === 0) { // 💡 PRÜFUNG HINZUGEFÜGT
+            if (result.canceled || !result.assets || result.assets.length === 0) { 
                 setIsUploading(false);
                 return;
             }
 
-            const file = result.assets[0]; // Das ausgewählte Dokument
+            const file = result.assets[0];
 
-            // 2. Dokument an den Server senden
             await uploadDocument(clientId, file);
             
-            Alert.alert('Erfolg', `Dokument "${file.name}" wurde erfolgreich hochgeladen.`);
-            fetchReports(); // Berichtsliste neu laden, um den neuen Report/Link anzuzeigen
+            Toast.show({ type: 'success', text1: 'Erfolg', text2: `Dokument "${file.name}" wurde erfolgreich hochgeladen.` });
+            fetchReports(); 
 
         } catch (error) {
             console.error('Fehler beim Dokumenten-Upload:', error);
-            Alert.alert('Fehler', error.response?.data?.msg || 'Dokument konnte nicht hochgeladen werden.');
+            Toast.show({ type: 'error', text1: 'Fehler', text2: error.response?.data?.msg || 'Dokument konnte nicht hochgeladen werden.' });
         } finally {
             setIsUploading(false);
         }
     };
 
+    // --- LÖSCH-HANDLER (US8) ---
+    const handleDelete = async (reportId) => {
+        Alert.alert(
+            'Bericht löschen',
+            'Sind Sie sicher, dass Sie diesen Bericht endgültig löschen möchten?',
+            [
+                { text: 'Abbrechen', style: 'cancel' },
+                { 
+                    text: 'Löschen', 
+                    style: 'destructive', 
+                    onPress: async () => {
+                        setIsLoadingReports(true);
+                        try {
+                            await deleteReport(reportId);
+                            fetchReports(); 
+                            Toast.show({ type: 'success', text1: 'Bericht gelöscht' });
+                        } catch (err) {
+                            console.error("Löschfehler:", err.response?.data || err);
+                            Toast.show({ type: 'error', text1: 'Löschen fehlgeschlagen', text2: err.response?.data?.msg || 'Serverfehler.' });
+                        } finally {
+                            setIsLoadingReports(false);
+                        }
+                    }
+                },
+            ]
+        );
+    };
+
+    // --- BEARBEITUNGS-HANDLER (US7) ---
+    const handleEditSave = async () => {
+        if (!editingReportId || !editText.trim()) return;
+
+        setIsLoadingReports(true);
+        try {
+            await updateReport(editingReportId, editText);
+        
+            setEditingReportId(null);
+            setEditText('');
+            fetchReports(); 
+            Toast.show({ type: 'success', text1: 'Bericht aktualisiert' });
+
+        } catch (err) {
+            console.error("Update Fehler:", err.response?.data || err);
+            Toast.show({ type: 'error', text1: 'Update fehlgeschlagen', text2: err.response?.data?.msg || 'Serverfehler.' });
+        } finally {
+            setIsLoadingReports(false);
+        }
+    };
+
+    // Startet den Bearbeitungsmodus für einen Bericht
+    const startEditing = (report) => {
+        const initialText = report.reportText || report.content || '';
+        setEditText(initialText);
+        setEditingReportId(report._id);
+    };
+
+
+    if (authLoading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#0000ff" />
+                <Text style={{marginTop: 10, color: '#555'}}>Authentifizierung wird geprüft...</Text>
+            </View>
+        );
+    }
+    
+    // Finaler Return Block: Übergibt alle notwendigen Handler und Zustände
     return (
         <View style={styles.mainContainer}>
             
@@ -230,7 +364,25 @@ const ReportScreen = () => {
                     <FlatList
                         data={reports}
                         keyExtractor={item => item._id.toString()}
-                        renderItem={({ item }) => <ReportItem report={item} />}
+                        renderItem={({ item }) => (
+                            <ReportItem 
+                                report={item} 
+                                // Zustand für Bearbeitung
+                                isEditing={editingReportId === item._id}
+                                editText={editText}
+                                setEditText={setEditText}
+                                setEditingReportId={setEditingReportId}
+
+                                // Handler
+                                onEditStart={startEditing}
+                                onEditSave={handleEditSave}
+                                onDelete={handleDelete}
+
+                                // Berechtigungen (vom Auth-Context)
+                                currentUserId={currentUserId}
+                                currentUserRole={currentUserRole}
+                            />
+                        )}
                         refreshControl={
                             <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} colors={['#3498db']} />
                         }
@@ -240,6 +392,7 @@ const ReportScreen = () => {
                     />
                 )}
             </View>
+            <Toast />
         </View>
     );
 };
@@ -317,6 +470,38 @@ const styles = StyleSheet.create({
     uploadButtonContainer: {
         marginTop: 10,
         marginBottom: 10,
+    },
+    
+    // 💡 NEUE STYLES FÜR BEARBEITUNG
+    actionRow: {
+        flexDirection: 'row',
+        justifyContent: 'flex-start', // Links-bündig
+        gap: 10, // Abstand zwischen Buttons
+        marginTop: 10,
+        paddingTop: 10,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+    },
+    editInput: { // Style für das Textfeld im Bearbeitungsmodus
+        borderWidth: 1,
+        borderColor: '#3498db',
+        borderRadius: 5,
+        padding: 10,
+        minHeight: 100,
+        marginBottom: 10,
+        backgroundColor: '#f9f9f9',
+    },
+    lockedText: {
+        color: 'orange',
+        fontWeight: 'bold',
+        alignSelf: 'center',
+        marginLeft: 'auto', // Schiebt den Text nach rechts
+    },
+    documentLink: {
+        color: '#3498db',
+        fontWeight: '600',
+        fontSize: 15,
+        paddingVertical: 5,
     }
 });
 

@@ -1,5 +1,6 @@
 // utils/api.js
-import axios from 'axios'; 
+import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 // Basis-URL des Backends (passen Sie den Port an, falls Ihr Backend woanders läuft)
 const API_URL = 'https://denunciatively-snappy-glenn.ngrok-free.dev/api'; 
@@ -75,6 +76,20 @@ export const createReport = (clientId, reportTextContent) => {
 // US6: Berichte für einen Klienten abrufen
 export const getClientReports = (clientId) => {
     return apiClient.get(`/reports/${clientId}`); 
+};
+
+// US7: Bericht bearbeiten
+export const updateReport = (reportId, reportText) => {
+    // 💡 KORREKTUR: Verwende apiClient, das die Basis-URL und den Token-Header bereits enthält
+    return apiClient.put(`/reports/${reportId}`, 
+        { reportText }
+    );
+};
+
+// US8: Bericht löschen
+export const deleteReport = (reportId) => {
+    // 💡 KORREKTUR: Verwende apiClient
+    return apiClient.delete(`/reports/${reportId}`); 
 };
 
 // US4: Funktion zum Hochladen eines Dokuments

@@ -26,7 +26,7 @@ const checkClientAccess = async (userId, clientId) => {
 // US5: Neuen Textbericht erstellen
 export const createReport = async (req, res) => {
     const { clientId, reportText, type, isDocument } = req.body;
-    const authorId = req.user._id; // Vom JWT aus der 'protect' Middleware
+    const authorId = req.user._id.toString(); // Vom JWT aus der 'protect' Middleware
 
     console.log("DEBUG: Author ID (Fachkraft):", authorId);
     console.log("DEBUG: Client ID (Übergeben):", clientId);
@@ -235,5 +235,98 @@ export const getClientReports = async (req, res) => {
     } catch (error) {
         console.error('Fehler beim Abrufen der Berichte:', error.message);
         res.status(500).json({ msg: 'Serverfehler beim Laden der Berichte.' });
+    }
+};
+
+// ... (bestehende Controller, z.B. getClientReports)
+
+/**
+ * US7: Bericht bearbeiten.
+ * Route: PUT /api/reports/:reportId
+ */
+export const updateReport = async (req, res) => {
+    const { reportId } = req.params;
+    const { reportText } = req.body;
+    const userId = req.user._id;
+    const userRole = req.user.role;
+
+    try {
+        const report = await Report.findById(reportId);
+
+        if (!report) {
+            return res.status(404).json({ msg: 'Bericht nicht gefunden.' });
+        }
+
+        // 1. Zuweisung prüfen: Nur der Ersteller oder Admin darf bearbeiten
+        const isCreator = report.createdBy.toString() === userId.toString();
+        const isAdmin = userRole === 'admin';
+
+        if (!isCreator && !isAdmin) {
+            return res.status(403).json({ msg: 'Sie sind nicht berechtigt, diesen Bericht zu bearbeiten.' });
+        }
+
+        // 2. Sperrstatus prüfen: Nur ungesperrte Berichte dürfen bearbeitet werden
+        if (report.isLocked) {
+            return res.status(403).json({ msg: 'Dieser Bericht ist gesperrt und kann nicht bearbeitet werden.' });
+        }
+
+        // 3. Update durchführen
+        report.reportText = reportText;
+        report.content = reportText.substring(0, 100); // Update der Kurzzusammenfassung
+        report.updatedAt = Date.now(); // Optional: Festhalten, wann der Bericht zuletzt geändert wurde
+
+        await report.save();
+
+        res.json(report);
+
+    } catch (err) {
+        console.error('Fehler beim Bearbeiten des Berichts:', err.message);
+        res.status(500).json({ msg: 'Serverfehler beim Bearbeiten des Berichts.' });
+    }
+};
+
+/**
+ * US8: Bericht löschen.
+ * Route: DELETE /api/reports/:reportId
+ */
+export const deleteReport = async (req, res) => {
+    const { reportId } = req.params;
+    const userId = req.user._id;
+    const userRole = req.user.role;
+
+    try {
+        const report = await Report.findById(reportId);
+
+        if (!report) {
+            // Auch wenn nicht gefunden, senden wir 204 No Content, um es idempotent zu machen.
+            return res.status(204).send(); 
+        }
+        
+        // 1. Zuweisung prüfen: Nur der Ersteller oder Admin darf löschen
+        const isCreator = report.createdBy.toString() === userId.toString();
+        const isAdmin = userRole === 'admin';
+
+        if (!isCreator && !isAdmin) {
+            return res.status(403).json({ msg: 'Sie sind nicht berechtigt, diesen Bericht zu löschen.' });
+        }
+        
+        // 2. Sperrstatus prüfen: Nur ungesperrte Berichte dürfen gelöscht werden
+        if (report.isLocked) {
+             return res.status(403).json({ msg: 'Dieser Bericht ist gesperrt und kann nicht gelöscht werden.' });
+        }
+
+        // HINWEIS: Bei DOKUMENTEN müsste hier die Datei auch aus S3 gelöscht werden!
+        if (report.type === 'DOCUMENT') {
+            // TODO: Fügen Sie hier später die Logik zum Löschen des Objekts aus S3 hinzu
+            console.warn(`[WARN] Dokument gelöscht, S3-Objekt muss noch entfernt werden: ${report.fileMetadata.storagePath}`);
+        }
+
+        await Report.deleteOne({ _id: reportId });
+
+        res.status(204).send(); // Erfolgreich gelöscht (No Content)
+
+    } catch (err) {
+        console.error('Fehler beim Löschen des Berichts:', err.message);
+        res.status(500).json({ msg: 'Serverfehler beim Löschen des Berichts.' });
     }
 };
