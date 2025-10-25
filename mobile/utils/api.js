@@ -49,6 +49,10 @@ export const getSpecialists = () => {
     // Sendet an den neuen Endpunkt
     return apiClient.get('/users/specialists'); 
 };
+// US4: Holt den Download-Link für ein gespeichertes Dokument
+export const getDownloadLink = (reportId) => {
+    return apiClient.get(`/reports/download/${reportId}`); 
+};
 
 // US5: Neuen Bericht senden (nur Text)
 export const createReport = (clientId, reportTextContent) => {

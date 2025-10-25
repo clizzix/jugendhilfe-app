@@ -6,8 +6,8 @@ import { protect, authorize } from '../middleware/authMiddleware.js';
 import { 
     createReport, 
     uploadDocument, 
-    getClientReports // US6: Neu hinzugefügt
-    // downloadPDF // Falls benötigt
+    getClientReports, // US6: Neu hinzugefügt
+    downloadDocumentController// downloadPDF // Falls benötigt
 } from '../controllers/reportController.js'; 
 import { startTranslation } from '../controllers/translationController.js';
 
@@ -40,7 +40,8 @@ router.post('/', protect, authorize('fachkraft'), createReport);
 // -------------------------------------------------------------------------
 // Benötigt die Rolle 'fachkraft'. Multer fängt das 'document'-Feld ab.
 router.post('/document', authorize('fachkraft'), upload.single('document'), uploadDocument); 
-
+// DOKUMENT-DOWNLOAD-PFAD ABRUFEN
+router.get('/download/:reportId', protect, authorize('fachkraft', 'verwaltung'), downloadDocumentController);
 
 // -------------------------------------------------------------------------
 // US6: BERICHTE ABRUFEN (Anzeige in Mobile App & Dashboard)
@@ -48,7 +49,7 @@ router.post('/document', authorize('fachkraft'), upload.single('document'), uplo
 // -------------------------------------------------------------------------
 // Erfordert keine spezielle authorize-Middleware, da die Berechtigungsprüfung 
 // (Fachkraft dem Klienten zugewiesen oder Rolle Verwaltung) IM Controller (getClientReports) erfolgt.
-router.get('/:clientId', getClientReports);
+router.get('/:clientId', protect, authorize('fachkraft', 'verwaltung'), getClientReports);
 
 
 // -------------------------------------------------------------------------

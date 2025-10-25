@@ -11,15 +11,18 @@ import {
     ScrollView,
     FlatList, 
     ActivityIndicator, 
-    RefreshControl 
+    RefreshControl,
+    TouchableOpacity, 
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
-import { createReport, getClientReports, uploadDocument } from '../utils/api.js'; 
+import { createReport, getClientReports, uploadDocument, getDownloadLink } from '../utils/api.js';
+import * as Linking from 'expo-linking'; 
 
 
 // --- Komponente für die Anzeige eines Berichts ---
 const ReportItem = ({ report }) => {
+    const [isDownloading, setIsDownloading] = useState(false);
     // Formatierung des Datums
     const formattedDate = new Date(report.createdAt).toLocaleDateString('de-DE', {
         day: '2-digit',
@@ -29,14 +32,47 @@ const ReportItem = ({ report }) => {
         minute: '2-digit',
     });
 
+    const handleDownload = async () => {
+        if (report.type !== 'DOCUMENT') return;
+        setIsDownloading(true);
+        try {
+            // 1. Download-Link vom Backend holen
+            const response = await getDownloadLink(report._id);
+            const { downloadUrl, fileName } = response.data;
+
+            // 2. Datei im Browser/Viewer öffnen
+            // WICHTIG: Linking.openURL ist der Standardweg in Expo
+            await Linking.openURL(downloadUrl); 
+            Alert.alert('Download gestartet', `Öffne Dokument: ${fileName}`);
+
+        } catch (error) {
+            Alert.alert('Fehler', 'Konnte Download-Link nicht abrufen.');
+            console.error(error.response?.data?.msg || error.message);
+        } finally {
+            setIsDownloading(false);
+        }
+    };
+
     return (
-        <View style={styles.reportItem}>
+        <TouchableOpacity 
+            // NEU: Nur klicken erlauben, wenn es ein Dokument ist
+            onPress={report.type === 'DOCUMENT' ? handleDownload : null} 
+            style={styles.reportItem}
+        >
             <Text style={styles.reportHeader}>
                 Bericht von: {report.createdBy?.username || 'Unbekannt'}
                 <Text style={styles.reportDate}> ({formattedDate})</Text>
             </Text>
-            <Text style={styles.reportContent}>{report.reportText || report.content}</Text>
-        </View>
+            
+            {/* NEU: Bedingte Anzeige für Dokumente oder Text */}
+            {report.type === 'DOCUMENT' ? (
+                <Text style={styles.documentLink}>
+                    {isDownloading ? "Dokument wird geöffnet..." : `📁 ${report.fileMetadata?.originalName || 'Dokument'} (Zum Öffnen tippen)`}
+                </Text>
+            ) : (
+                <Text style={styles.reportContent}>{report.reportText || report.content}</Text>
+            )}
+        </TouchableOpacity>
     );
 };
 // --------------------------------------------------
@@ -128,7 +164,7 @@ const ReportScreen = () => {
             });
 
             // Wenn der Benutzer den Vorgang abbricht
-            if (result.canceled) {
+            if (result.canceled || !result.assets || result.assets.length === 0) { // 💡 PRÜFUNG HINZUGEFÜGT
                 setIsUploading(false);
                 return;
             }

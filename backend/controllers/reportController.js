@@ -2,9 +2,17 @@
 import Report from '../models/Report.js';
 import Client from '../models/Client.js';
 import fs from 'fs';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import path from 'path';
 // import { uploadFileToCloud } from '../utils/cloudStorage.js'; // Wird später erstellt
 
+// S3 Konfiguration
+// const bucketName = process.env.S3_BUCKET_NAME;
+// const awsRegion = process.env.AWS_REGION;
+
+//const s3 = new S3Client({
+//    region: awsRegion,
+//});
 // Hilfsfunktion: Prüft, ob der angemeldete User den Klienten bearbeiten darf
 const checkClientAccess = async (userId, clientId) => {
     const client = await Client.findById(clientId);
@@ -47,26 +55,56 @@ export const createReport = async (req, res) => {
         res.status(500).send('Fehler beim Speichern des Berichts.');
     }
 };
-// --- MOCK-Funktion für Tests ---
-// Simuliert das Hochladen in die Cloud und gibt Metadaten zurück.
-// In einer echten App würde HIER die AWS/Google/Azure-Logik stehen.
+// 💡 NEUE FUNKTION: Echter S3 Upload
 const uploadFileToCloud = async (file) => {
-    console.log(`[MOCK] Starte Upload von: ${file.originalname}`);
-    // Simuliere Dateispeicherung/Umbenennung
-    const uniqueFileName = `${Date.now()}-${file.originalname}`;
-    
-    // Simuliere die Speicherung in einem öffentlichen/geschützten URL-Pfad
-    const mockStorageUrl = `/storage/documents/${uniqueFileName}`; 
-    
-    // HINWEIS: Hier muss die Logik zur Verschiebung der Datei an den Cloud-Speicher
-    // (und zur Fehlerbehandlung) implementiert werden.
-    
-    return {
-        filename: uniqueFileName,
-        url: mockStorageUrl,
-    };
-};
+    const bucketName = process.env.S3_BUCKET_NAME;
+    const awsRegion = process.env.AWS_REGION;
 
+    if (!bucketName) {
+        throw new Error('S3_BUCKET_NAME ist nicht in den Umgebungsvariablen gesetzt.');
+    }
+
+    const s3 = new S3Client({ region: awsRegion });
+    
+    // Erstellt einen lesbaren Stream aus der temporär gespeicherten Datei
+    const fileStream = fs.createReadStream(file.path);
+// 1. Dekodiere den originalen Dateinamen, um doppelte Kodierung zu vermeiden.
+    // Falls der Name bereits vom Frontend kodiert wurde (%20), wird er hier bereinigt.
+    const decodedOriginalName = decodeURIComponent(file.originalname);
+    
+    // 2. Erstelle einen sicheren Namen (ersetze problematische Zeichen)
+    // Wir ersetzen problematische Zeichen, lassen aber die Klammern für encodeURIComponent später zu.
+    const safeBaseName = decodedOriginalName.replace(/[^a-zA-Z0-9\s.\-()_]/g, ''); 
+    
+    const uniqueKeyBase = `${Date.now()}-${safeBaseName}`; 
+    const uniqueKey = `reports/${uniqueKeyBase}`;
+
+    const uploadParams = {
+        Bucket: bucketName,
+        Key: uniqueKey, // Pfad und Dateiname im Bucket
+        Body: fileStream,
+        ContentType: file.mimetype,
+        ACL: 'public-read', // Setzt die Datei als öffentlich lesbar (WICHTIG für direkten Link)
+    };
+
+    try {
+        // Führt den Upload zu S3 aus
+        await s3.send(new PutObjectCommand(uploadParams));
+
+        // Konstruiere die öffentliche URL (Dies funktioniert nur, wenn ACL auf 'public-read' gesetzt ist!)
+        const encodedKey = encodeURIComponent(uniqueKey);
+        
+        const s3Url = `https://${bucketName}.s3.${awsRegion}.amazonaws.com/${encodedKey}`;
+        
+        return {
+            filename: uniqueKey,
+            url: s3Url, // ⬅️ WICHTIG: Dies ist jetzt eine HTTPS URL
+        };
+    } catch (error) {
+        console.error("S3 Upload Error:", error);
+        throw new Error("Fehler beim Hochladen zu S3.");
+    }
+};
 // US4: Datei hochladen (Komplex: erfordert Multer und Cloud-Speicher)
 export const uploadDocument = async (req, res) => {
     // 💡 FÜGE DIESEN LOG HINZU
@@ -132,6 +170,44 @@ export const uploadDocument = async (req, res) => {
         return res.status(500).json({ 
             msg: `Serverfehler beim Hochladen der Datei. Details: ${err.message}` 
         });
+    }
+};
+
+export const downloadDocumentController = async (req, res) => {
+    // Die Berichts-ID kommt aus den URL-Parametern
+    const { reportId } = req.params; 
+    const authorId = req.user._id;
+
+    try {
+        // 1. Bericht (Dokument) anhand der ID finden
+        const report = await Report.findById(reportId).populate('client', 'assignedTo');
+        
+        if (!report) {
+            return res.status(404).json({ msg: 'Dokument nicht gefunden.' });
+        }
+
+        // 2. Sicherheitsprüfung: Ist es überhaupt ein Dokument?
+        if (report.type !== 'DOCUMENT' || !report.fileMetadata || !report.fileMetadata.storagePath) {
+             return res.status(400).json({ msg: 'Dieser Bericht ist kein gültiges Dokument.' });
+        }
+        
+        // 3. Sicherheitsprüfung: Zugriff auf den zugehörigen Klienten prüfen
+        const clientId = report.client._id;
+        if (!(await checkClientAccess(authorId, clientId))) {
+             return res.status(403).json({ msg: 'Keine Berechtigung, dieses Dokument einzusehen.' });
+        }
+        
+        // 4. Speicherpfad (URL) senden
+        // HINWEIS: Hier senden wir die URL direkt zurück. In einer Produktionsumgebung 
+        // müssten Sie hier einen temporär signierten Link (z.B. für S3 oder GCS) senden.
+        res.status(200).json({ 
+            downloadUrl: report.fileMetadata.storagePath,
+            fileName: report.fileMetadata.fileName
+        });
+
+    } catch (err) {
+        console.error("Fehler beim Abrufen des Dokumentenpfades:", err.message);
+        res.status(500).json({ msg: 'Serverfehler beim Laden der Dokumenteninformation.' });
     }
 };
 /**

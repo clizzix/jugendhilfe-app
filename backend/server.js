@@ -1,6 +1,8 @@
 // server.js
-import express from 'express';
 import dotenv from 'dotenv';
+// Umgebungsvariablen laden
+dotenv.config();
+import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';             
 import authRoutes from './routes/authRoutes.js';
@@ -10,8 +12,7 @@ import userRoutes from './routes/userRoutes.js';
 
 
 
-// Umgebungsvariablen laden
-dotenv.config();
+
 
 const app = express();
 const PORT = process.env.PORT || 5001;
