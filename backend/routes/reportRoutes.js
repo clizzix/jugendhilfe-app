@@ -31,7 +31,7 @@ router.use(protect); // Muss angemeldet sein
 // -------------------------------------------------------------------------
 // Benötigt die Rolle 'fachkraft'. Wir verwenden '/' anstelle von '/text' 
 // für den Haupt-POST-Endpunkt zur Einfachheit.
-router.post('/', authorize('fachkraft'), createReport);
+router.post('/', protect, authorize('fachkraft'), createReport);
 
 
 // -------------------------------------------------------------------------

@@ -17,8 +17,12 @@ const checkClientAccess = async (userId, clientId) => {
 
 // US5: Neuen Textbericht erstellen
 export const createReport = async (req, res) => {
-    const { clientId, reportText } = req.body;
+    const { clientId, reportText, type, isDocument } = req.body;
     const authorId = req.user._id; // Vom JWT aus der 'protect' Middleware
+
+    console.log("DEBUG: Author ID (Fachkraft):", authorId);
+    console.log("DEBUG: Client ID (Übergeben):", clientId);
+    console.log("DEBUG: Report Text Länge:", reportText ? reportText.length : 0);
 
     try {
         // 1. Zuweisung prüfen (WICHTIGE SICHERHEITSPRÜFUNG)
@@ -30,9 +34,10 @@ export const createReport = async (req, res) => {
         const newReport = await Report.create({
             client: clientId,
             createdBy: authorId,
-            content: reportText,
+            content: reportText.substring(0, 100),
             reportText: reportText,
             type: 'REPORT',
+            isDocument: false,
             // isLocked bleibt 'false' bis zur Freigabe durch die Verwaltung
         });
 

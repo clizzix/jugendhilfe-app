@@ -4,10 +4,14 @@ import axios from 'axios';
 // Basis-URL des Backends (passen Sie den Port an, falls Ihr Backend woanders läuft)
 const API_URL = 'https://denunciatively-snappy-glenn.ngrok-free.dev/api'; 
 
-let authToken = null;
-
 export const setAuthToken = (token) => {
-    authToken = token;
+    if (token) {
+        // Fügt den Token zu ALLEN Requests HINZU
+        apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+        // Entfernt den Token (für Logout)
+        delete apiClient.defaults.headers.common['Authorization'];
+    }
 }
 const apiClient = axios.create({
     baseURL: API_URL,
@@ -15,15 +19,6 @@ const apiClient = axios.create({
     headers: {
         'Content-Type': 'application/json',
     }
-});
-
-apiClient.interceptors.request.use(config => {
-    if (authToken) {
-        config.headers.Authorization = `Bearer ${authToken}`;
-    }
-    return config;
-}, error => {
-    return Promise.reject(error);
 });
 
 // Beispiel-Aufruf für das Login
@@ -56,9 +51,21 @@ export const getSpecialists = () => {
 };
 
 // US5: Neuen Bericht senden (nur Text)
-export const createReport = (reportData) => {
+export const createReport = (clientId, reportTextContent) => {
     // reportData sollte { clientId, reportText } enthalten
-    return apiClient.post('/reports', reportData); 
+    const content = reportTextContent ? reportTextContent.substring(0, 100) : '';
+
+    const dataToSend = {
+        clientId: clientId,
+        reportText: reportTextContent,
+        type: 'REPORT',
+        content: content,
+        isDocument: false
+    };
+
+    console.log("AXIOS SENDING:", dataToSend);
+
+    return apiClient.post('/reports', dataToSend); 
 };
 
 // US6: Berichte für einen Klienten abrufen

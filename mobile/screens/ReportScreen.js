@@ -45,7 +45,6 @@ const ReportScreen = () => {
     const route = useRoute(); 
     const navigation = useNavigation();
     const { clientId, clientName } = route.params; 
-
     const [reportText, setReportText] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     
@@ -104,10 +103,7 @@ const ReportScreen = () => {
         setIsSaving(true);
 
         try {
-            await createReport({
-                clientId: clientId, 
-                reportText: reportText, 
-            });
+            await createReport(clientId, reportText);
             
             Alert.alert('Erfolg', 'Bericht wurde erfolgreich gespeichert.');
             setReportText(''); 
