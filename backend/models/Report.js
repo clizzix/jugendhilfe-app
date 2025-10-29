@@ -27,7 +27,7 @@ const ReportSchema = new mongoose.Schema({
     // Für hochgeladene Dateien (US4)
     fileMetadata: {
         fileName: String,
-        fileType: { type: String, enum: ['PDF', 'DOCX', 'SCAN', 'UNKNOWN'] },
+        fileType: { type: String, enum: ['image/jpeg', 'image/png', 'application/pdf', 'PDF', 'DOCX', 'SCAN', 'UNKNOWN'] },
         // Speichert den Pfad oder die URL zum Cloud-Speicher
         storagePath: String, 
         originalName: String,

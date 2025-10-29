@@ -1,29 +1,34 @@
 // controllers/translationController.js
 import fs from 'fs';
 import pdfkit from 'pdfkit';
-import { translateText, performOCR } from '../utils/kiService.js'; // Mock-Funktionen
+// import { translateText, performOCR } from '../utils/kiService.js'; // Mock-Funktionen
 import Report from '../models/Report.js';
+import { translateText } from '../services/deeplApi.js';
+import { detectTextByUrl } from '../services/visionApi.js';
 
 // Ziel-Sprachcodes (basierend auf Ihrer Anforderung)
-const TARGET_LANGUAGES = ['tr', 'ar', 'fa', 'ru', 'so']; // Türkisch, Arabisch, Persisch, Russisch, Somalisch (Codes anpassen!)
+const TARGET_LANGUAGES = ['EN-US', 'TR', 'AR', 'FA', 'RU', 'SO']; // Türkisch, Arabisch, Persisch, Russisch, Somalisch (Codes anpassen!)
 
 // Funktion zur Durchführung des Übersetzungsprozesses
 export const startTranslation = async (req, res) => {
     const { reportId, targetLang } = req.body;
-    const userId = req.user.id; // Prüfen, wer die Anfrage stellt
+    const userId = req.user._id ? req.user._id.toString() : req.user.id.toString(); // Prüfen, wer die Anfrage stellt
 
     if (!TARGET_LANGUAGES.includes(targetLang)) {
         return res.status(400).json({ msg: 'Ungültige Zielsprache.' });
     }
 
     try {
-        const report = await Report.findById(reportId);
+        const report = await Report.findById(reportId).populate('client', 'targetLanguage');
         if (!report) {
             return res.status(404).json({ msg: 'Bericht nicht gefunden.' });
         }
         
+        // SICHERHEITSPRÜFUNG: Darf der Benutzer den Bericht übersetzen?
+        const isCreator = report.createdBy?.toString() === userId.toString();
+        const isAdminOrVerwaltung = req.user.role === 'admin' || req.user.role === 'verwaltung';
         // SICHERHEITSPRÜFUNG: Nur zugewiesene Fachkraft/Verwaltung darf übersetzen
-        if (report.authorId.toString() !== userId.toString() && req.user.role !== 'verwaltung') {
+        if (!isCreator && !isAdminOrVerwaltung) {
              return res.status(403).json({ msg: 'Keine Berechtigung zur Übersetzung dieses Berichts.' });
         }
 
@@ -31,14 +36,14 @@ export const startTranslation = async (req, res) => {
         
         // 1. TEXT-EXTRAKTION (OCR für Dokumente, Text für Berichte)
         if (report.type === 'DOCUMENT' && report.fileMetadata?.storagePath) {
-            // Dies ist der komplexeste Teil: Datei von Cloud-Speicher abrufen, OCR durchführen
-            // Angenommen, wir laden die Datei temporär herunter und senden sie an den OCR-Dienst
-            // const filePath = downloadFile(report.fileMetadata.storagePath); // Mock
-            // originalText = await performOCR(filePath); 
-            
-            // FÜR DAS MVP: Hier sollte die Logik für OCR implementiert werden.
-            // Zur Vereinfachung gehen wir davon aus, dass wir den Text extrahieren können.
-            originalText = 'MOCK: Extracted text from PDF/Scan...'; 
+        // 💡 ÄNDERUNG: Nutzen Sie den bereits extrahierten reportText, falls vorhanden (Optimierung)
+            if (report.reportText && report.reportText.length > 100 && report.reportText.substring(0, 10) !== 'Dokument') {
+                 originalText = report.reportText;
+            } else {
+                // 💡 FALLBACK/OCR: Führen Sie OCR erneut aus, falls kein Text vorhanden ist (oder extrahieren Sie ihn von der Cloud-URL)
+                const fileUrl = report.fileMetadata.storagePath; 
+                originalText = await detectTextByUrl(fileUrl);
+            }
 
         } else if (report.type === 'REPORT' && report.reportText) {
             originalText = report.reportText;

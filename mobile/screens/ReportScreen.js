@@ -20,6 +20,7 @@ import { createReport, getClientReports, uploadDocument, getDownloadLink, delete
 import * as Linking from 'expo-linking'; 
 import Toast from 'react-native-toast-message'; 
 import { useAuth } from '../context/AuthContext'; 
+import ReportTranslationView from '../components/reports/ReportTranslationView.jsx';
 
 
 // --- Komponente für die Anzeige eines Berichts ---
@@ -36,6 +37,7 @@ const ReportItem = ({
     currentUserRole,
 }) => {
     const [isDownloading, setIsDownloading] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     // Hilfsvariablen
     const isCreator = report.createdBy?._id?.toString() === currentUserId?.toString(); 
@@ -72,7 +74,7 @@ const ReportItem = ({
     
     return (
         <TouchableOpacity 
-            onPress={isTextReport || isEditing ? null : handleDownload} 
+            onPress={isTextReport || isEditing ? null : () => setIsExpanded(!isExpanded)} 
             style={styles.reportItem}
             activeOpacity={isEditing ? 1 : 0.6}
         >
@@ -81,6 +83,14 @@ const ReportItem = ({
                 <Text style={styles.reportDate}> ({formattedDate})</Text>
             </Text>
             
+            {/* --- 💡 NEU: ÜBERSETZUNGSANSICHT (UNTER DEM BERICHTSTEXT) --- */}
+            {isExpanded && (
+                <ReportTranslationView 
+                    reportId={report._id} 
+                    // Angenommen, die Klientensprache kann vom Client-Objekt im Report abgerufen werden
+                    clientLanguage={report.client?.targetLanguage || 'EN-US'} 
+                />
+            )}
             {/* --- BEARBEITUNGSANSICHT (EDITING MODE) --- */}
             {isEditing ? (
                 <>

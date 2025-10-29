@@ -13,10 +13,13 @@
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.917.0",
+    "@aws-sdk/s3-request-presigner": "^3.919.0",
     "@google-cloud/vision": "^5.3.4",
+    "axios": "^1.13.1",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "deepl": "^1.0.13",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
@@ -26,5 +29,11 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
+  },
+  "overrides": {
+    "axios": "^1.13.1",
+    "deepl": {
+      "axios": "^1.13.1"
+    }
   }
 }

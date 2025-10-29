@@ -5,6 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Basis-URL des Backends (passen Sie den Port an, falls Ihr Backend woanders läuft)
 const API_URL = 'https://denunciatively-snappy-glenn.ngrok-free.dev/api'; 
 
+export const BASE_URL = 'http://192.168.0.161:5001'
+
 export const setAuthToken = (token) => {
     if (token) {
         // Fügt den Token zu ALLEN Requests HINZU
